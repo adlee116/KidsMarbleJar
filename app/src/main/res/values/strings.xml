@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">KidsMarbleJar</string>
+    <string name="marble_jar">Marble Jar</string>
+    <string name="add_new_user">Add new user</string>
+    <string name="name">Name</string>
+    <string name="goal">Reward name</string>
+    <string name="parent">Parent</string>
+    <string name="requires_password">Requires password</string>
+    <string name="money">Money</string>
+    <string name="reward">Reward</string>
+    <string name="current_number_of_marbles">Current number of marbles</string>
+    <string name="marble_value">Marble value</string>
+    <string name="marbles_required">Marbles required</string>
+    <string name="save">Save</string>
+    <string name="take_a_photo">Take a photo</string>
+</resources>
