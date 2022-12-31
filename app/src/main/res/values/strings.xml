@@ -9,8 +9,13 @@
     <string name="money">Money</string>
     <string name="reward">Reward</string>
     <string name="current_number_of_marbles">Current number of marbles</string>
-    <string name="marble_value">Marble value</string>
+    <string name="marble_value">How much each marble\'s worth</string>
     <string name="marbles_required">Marbles required</string>
     <string name="save">Save</string>
     <string name="take_a_photo">Take a photo</string>
+    <string name="clear_photo">Clear photo</string>
+    <string name="save_photo">Save photo</string>
+    <string name="select_from_gallery">Select from gallery</string>
+    <string name="open_the_gallery">Open the gallery</string>
+    <string name="start_capture">Start capture</string>
 </resources>

@@ -13,14 +13,14 @@ data class UserEntity(
     @ColumnInfo(name = "user_name")
     val name: String,
 
-    @ColumnInfo(name = "user_image", typeAffinity = ColumnInfo.BLOB)
-    val image: ByteArray?,
+    @ColumnInfo(name = "user_image")
+    val image: String,
 
     val marbles: Int,
 
     val conversionType: Int,
 
-    val conversionValue: Int,
+    val conversionValue: Double,
 
     @ColumnInfo(name = "requires_password")
     val requiresPassword: Boolean,

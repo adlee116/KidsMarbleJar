@@ -1,29 +1,31 @@
 package com.example.kidsmarblejar.presentation.addUser
 
+import android.app.Activity
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
 import android.widget.Toast
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
+import androidx.core.net.toUri
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import com.bumptech.glide.Glide
+import com.example.kidsmarblejar.R
 import com.example.kidsmarblejar.databinding.ActivityNewUserBinding
+import com.example.kidsmarblejar.databinding.CameraBottomDialogBinding
+import com.example.kidsmarblejar.domain.NewUser
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.koin.androidx.viewmodel.ext.android.viewModel
-import java.io.File
-import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.*
+
 
 class AddUserActivity : AppCompatActivity() {
 
     lateinit var binding: ActivityNewUserBinding
     private val viewModel: AddUserViewModel by viewModel()
+    private var isBottomSheetOpen = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,64 +34,42 @@ class AddUserActivity : AppCompatActivity() {
         setContentView(view)
         setClickListeners()
         observeViewModel()
+        getDataIfRequired()
+        viewModel.process(AddUserEvent.Initialise)
     }
 
-    lateinit var currentPhotoPath: String
-
-    @Throws(IOException::class)
-    private fun createImageFile(): File {
-        // Create an image file name
-        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
-        // Might not want to double bang this
-        val storageDir: File = getExternalFilesDir(Environment.DIRECTORY_PICTURES)!!
-        return File.createTempFile(
-            "JPEG_${timeStamp}_", /* prefix */
-            ".jpg", /* suffix */
-            storageDir /* directory */
-        ).apply {
-            // Save a file: path for use with ACTION_VIEW intents
-            currentPhotoPath = absolutePath
+    private fun getDataIfRequired() {
+        if (intent.hasExtra(USER)) {
+            getData()
+        } else {
+            viewModel.process(AddUserEvent.Initialise)
         }
     }
 
-    private fun dispatchTakePictureIntent() {
-        Intent(MediaStore.ACTION_IMAGE_CAPTURE).also { takePictureIntent ->
-            // Ensure that there's a camera activity to handle the intent
-            takePictureIntent.resolveActivity(packageManager)?.also {
-                // Create the File where the photo should go
-                val photoFile: File? = try {
-                    createImageFile()
-                } catch (ex: IOException) {
-                    // Error occurred while creating the File
-                    null
-                }
-                // Continue only if the File was successfully created
-                photoFile?.also {
-                    val photoURI: Uri = FileProvider.getUriForFile(
-                        this,
-                        "com.example.android.fileprovider",
-                        it
-                    )
-                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
-                    startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE)
-                }
-            }
+    private fun getData() {
+        val userEntity = intent.getIntExtra(USER, -1)
+        if (userEntity != -1) {
+            viewModel.process(AddUserEvent.GetUser(userEntity))
         }
+    }
+
+    private fun closeClickListeners() {
+        binding.addImageButton.setOnClickListener(null)
+        binding.addImageButton.setOnClickListener(null)
+        binding.requiresPassword.setOnCheckedChangeListener(null)
+        binding.adultToggleButton.setOnCheckedChangeListener(null)
+        binding.moneyToggleButton.setOnClickListener(null)
+        binding.rewardToggleButton.setOnClickListener(null)
+        binding.saveButton.setOnClickListener(null)
     }
 
     private fun setClickListeners() {
-        binding.saveButton.setOnClickListener {
-            viewModel.process(
-                AddUserEvent.SaveClicked(
-                    binding.firstNameTextFieldEditText.text.toString().trim(),
-                    conversionType = viewModel.rewardType ?: 1,
-                    conversionValue = binding.marbleValueEditText.text.toString().toInt(),
-                    requiresPassword = binding.requiresPassword.isEnabled,
-                    goal = binding.marblesRequiredEditText.text.toString().trim().toInt(),
-                    goalName = binding.rewardNameEditText.text.toString().trim(),
-                    isAdult = binding.adultToggleButton.isEnabled
-                )
-            )
+        binding.addImageButton.setOnClickListener { openBottomDialogForCamera() }
+        binding.requiresPassword.setOnCheckedChangeListener { _, isChecked ->
+            viewModel.process(AddUserEvent.RequiresPasswordToggled(isChecked))
+        }
+        binding.adultToggleButton.setOnCheckedChangeListener { _, isChecked ->
+            viewModel.process(AddUserEvent.ParentToggled(isChecked))
         }
         binding.moneyToggleButton.setOnClickListener {
             viewModel.process(AddUserEvent.MoneyToggled)
@@ -97,58 +77,121 @@ class AddUserActivity : AppCompatActivity() {
         binding.rewardToggleButton.setOnClickListener {
             viewModel.process(AddUserEvent.RewardToggled)
         }
-        binding.addImageButton.setOnClickListener {
-            addImage()
+        binding.saveButton.setOnClickListener {
+            when {
+                viewModel.newUser.isAdult -> viewModel.process(AddUserEvent.SaveAdultClicked(binding.firstNameTextFieldEditText.text.toString().trim()))
+                viewModel.newUser.rewardType == RewardType.REWARD -> viewModel.process(
+                    AddUserEvent.SaveRewardClicked(
+                        binding.firstNameTextFieldEditText.text.toString().trim(),
+                        binding.rewardNameEditText.text.toString().trim(),
+                        binding.marblesRequiredEditText.text.toString().trim().toInt()
+                    )
+                )
+                else -> viewModel.process(
+                    AddUserEvent.SaveMoneyClicked(
+                        binding.firstNameTextFieldEditText.text.toString().trim(),
+                        binding.marbleValueEditText.text.toString().trim().toDouble()
+                    )
+                )
+            }
         }
     }
 
-    private fun addImage() {
-        startActivity(Intent(this, AddCameraActivity::class.java))
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
-            val imageBitmap = data?.extras?.get("data") as Bitmap
-            binding.addImageButton.setImageBitmap(imageBitmap)
+    private val startCameraActivity = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uriString = result.data?.getStringExtra(CameraActivity.RESULT)
+            uriString?.let { setImage(it) }
         }
     }
 
-    private fun setPic() {
-        // Get the dimensions of the View
-        val targetW: Int = binding.addImageButton.width
-        val targetH: Int = binding.addImageButton.height
-
-        val bmOptions = BitmapFactory.Options().apply {
-            // Get the dimensions of the bitmap
-            inJustDecodeBounds = true
-
-            BitmapFactory.decodeFile(currentPhotoPath, this)
-
-            val photoW: Int = outWidth
-            val photoH: Int = outHeight
-
-            // Determine how much to scale down the image
-            val scaleFactor: Int = 1.coerceAtLeast((photoW / targetW).coerceAtMost(photoH / targetH))
-
-            // Decode the image file into a Bitmap sized to fill the View
-            inJustDecodeBounds = false
-            inSampleSize = scaleFactor
-            inPurgeable = true
-        }
-        BitmapFactory.decodeFile(currentPhotoPath, bmOptions)?.also { bitmap ->
-            binding.addImageButton.setImageBitmap(bitmap)
+    private fun setImage(uriString: String) {
+        val uri = uriString.toUri()
+        uri.let {
+            Glide.with(binding.root.context)
+                .load(it)
+                .placeholder(R.drawable.add_user_image)
+                .fitCenter()
+                .into(binding.addImageButton)
+            viewModel.process(AddUserEvent.AddedImage(it.toString()))
         }
     }
 
-    private fun galleryAddPic() {
-        Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE).also { mediaScanIntent ->
-            val f = File(currentPhotoPath)
-            mediaScanIntent.data = Uri.fromFile(f)
-            sendBroadcast(mediaScanIntent)
+    private fun openBottomDialogForCamera() {
+        if (isBottomSheetOpen) return
+        BottomSheetDialog(this).apply {
+            val binding = CameraBottomDialogBinding.inflate(layoutInflater, null, false)
+            setContentView(binding.root)
+            binding.photoButton.setOnClickListener {
+                dismiss()
+                startCameraActivity.launch(Intent(this@AddUserActivity, CameraActivity::class.java))
+            }
+
+            binding.galleryButton.setOnClickListener {
+                dismiss()
+            }
+
+            setOnDismissListener {
+                isBottomSheetOpen = false
+            }
+        }.show()
+
+    }
+
+    private fun initView(addUserState: AddUserState) {
+        when (addUserState) {
+            AddUserState.Loading -> binding.loadingPanel.isVisible = true
+            is AddUserState.Reading -> {
+                binding.loadingPanel.isVisible = false
+                updateUi(addUserState.newUser)
+            }
         }
+    }
+
+    private fun updateUi(newUser: NewUser) {
+        closeClickListeners()
+        binding.moneyToggleButton.isVisible = !newUser.isAdult
+        binding.rewardToggleButton.isVisible = !newUser.isAdult
+        binding.requiresPassword.isVisible = !newUser.isAdult
+        binding.marbleValueLayout.isVisible = !newUser.isAdult
+        binding.rewardNameLayout.isVisible = !newUser.isAdult
+        binding.marblesRequiredLayout.isVisible = !newUser.isAdult
+        binding.valueInfoIcon.isVisible = !newUser.isAdult
+
+        if (!newUser.isAdult) {
+            binding.moneyToggleButton.isSelected = newUser.rewardType == RewardType.MONEY
+            binding.rewardToggleButton.isSelected = newUser.rewardType == RewardType.REWARD
+            binding.requiresPassword.isSelected = newUser.requiresPassword
+            binding.adultToggleButton.isSelected = newUser.isAdult
+            binding.marbleValueLayout.isVisible = newUser.rewardType == RewardType.MONEY
+            binding.rewardNameLayout.isVisible = newUser.rewardType == RewardType.REWARD
+            binding.marblesRequiredLayout.isVisible = newUser.rewardType == RewardType.REWARD
+        }
+
+        binding.firstNameTextFieldEditText.setText(newUser.name)
+        if (newUser.image.isNotEmpty()) {
+            Glide.with(this)
+                .load(newUser.image)
+                .centerCrop()
+                .into(binding.addImageButton)
+        }
+        if (binding.rewardNameLayout.isVisible) binding.rewardNameEditText.setText(newUser.rewardName)
+        if (binding.marblesRequiredLayout.isVisible && newUser.marblesRequired > 0) binding.marblesRequiredEditText.setText(newUser.marblesRequired.toString())
+        if (binding.marbleValueLayout.isVisible) binding.marbleValueEditText.setText(newUser.marbleConversionRate.toString())
+        setClickListeners()
+    }
+
+    override fun onBackPressed() {
+        val resultIntent = Intent()
+        setResult(RESULT_CANCELED, resultIntent)
+        finish()
     }
 
     private fun observeViewModel() {
+        lifecycleScope.launchWhenStarted {
+            viewModel.addUserState.collectLatest {
+                initView(it)
+            }
+        }
         lifecycleScope.launch {
             viewModel.saveFailed.collectLatest {
                 Toast.makeText(
@@ -160,13 +203,24 @@ class AddUserActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             viewModel.saved.collectLatest {
+                val resultIntent = Intent()
+                setResult(RESULT_OK, resultIntent)
+                finish()
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.getUserFailed.collectLatest {
+                val resultIntent = Intent()
+                setResult(RESULT_CANCELED, resultIntent)
                 finish()
             }
         }
     }
 
     companion object {
-        const val REQUEST_IMAGE_CAPTURE = 100
+
+        const val USER = "user"
+
     }
 
 }

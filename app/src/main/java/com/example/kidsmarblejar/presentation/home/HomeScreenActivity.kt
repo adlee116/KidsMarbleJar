@@ -1,11 +1,16 @@
 package com.example.kidsmarblejar.presentation.home
 
+import android.app.Activity
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.example.kidsmarblejar.databinding.ActivityHomeScreenBinding
 import com.example.kidsmarblejar.presentation.addUser.AddUserActivity
+import com.example.kidsmarblejar.presentation.marbleJar.MarbleJarActivity
 import com.google.android.flexbox.FlexDirection
 import com.google.android.flexbox.FlexboxLayoutManager
 import com.google.android.flexbox.JustifyContent
@@ -60,23 +65,38 @@ class HomeScreenActivity : AppCompatActivity() {
                 }
             }
         }
+
+        lifecycleScope.launchWhenStarted {
+            viewModel.userAdded.collectLatest {
+
+            }
+        }
+
+        lifecycleScope.launchWhenStarted {
+            viewModel.homeState.collectLatest {
+                binding.loadingPanel.isVisible = it is HomeState.Loading
+            }
+        }
+    }
+
+    private val startAddUserActivity = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            viewModel.process(HomeEvent.UserAdded)
+        }
     }
 
     private fun addUserClicked() {
-        startActivity(Intent(this, AddUserActivity::class.java))
+        startAddUserActivity.launch(Intent(this@HomeScreenActivity, AddUserActivity::class.java))
     }
 
     private fun parentUserClicked(id: Int) {
-
+        startAddUserActivity.launch(Intent(this@HomeScreenActivity, AddUserActivity::class.java).apply {
+            putExtra(AddUserActivity.USER, id)
+        })
     }
 
     private fun childUserClicked(id: Int) {
-
-    }
-
-    private fun login() {
-//        val intent = Intent(this, QuestionOneActivity::class.java)
-//        startActivity(intent)
+        MarbleJarActivity.start(this, id)
     }
 }
 

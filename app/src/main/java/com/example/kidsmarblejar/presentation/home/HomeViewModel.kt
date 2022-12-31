@@ -5,12 +5,17 @@ import androidx.lifecycle.viewModelScope
 import com.example.kidsmarblejar.core.utils.justValue
 import com.example.kidsmarblejar.domain.GetAllUsersUseCase
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class HomeViewModel(
     private val getAllUsersUseCase: GetAllUsersUseCase
 ) : ViewModel() {
+
+    private val _homeState = MutableStateFlow<HomeState>(HomeState.Loading)
+    val homeState = _homeState.asStateFlow()
 
     private val _users = MutableSharedFlow<List<UserModel>>()
     val users = _users.asSharedFlow()
@@ -18,12 +23,16 @@ class HomeViewModel(
     private val _userClicked = MutableSharedFlow<Pair<Int, Boolean>>()
     val userClicked = _userClicked.asSharedFlow()
 
+    private val _userAdded = MutableSharedFlow<Unit>()
+    val userAdded = _userAdded.asSharedFlow()
+
     var currentUsers: List<UserModel> = emptyList()
 
     fun process(homeEvent: HomeEvent) {
         when (homeEvent) {
             is HomeEvent.Initialise -> initialise()
             is HomeEvent.UserItemClicked -> userItemClicked(homeEvent.userId)
+            HomeEvent.UserAdded -> initialise()
         }
     }
 
@@ -36,6 +45,7 @@ class HomeViewModel(
     }
 
     private fun initialise() {
+        _homeState.value = HomeState.Loading
         val userList = mutableListOf<UserEntity>()
         userList.addAll(getAllUsers())
         val userModels = userEntityToModel(userList)
@@ -44,10 +54,12 @@ class HomeViewModel(
     }
 
     private fun emitUsers(users: List<UserModel>) {
+        _homeState.value = HomeState.Reading
         viewModelScope.launch {
             _users.emit(users)
         }
     }
+
     private fun userEntityToModel(users: List<UserEntity>): MutableList<UserModel> {
         val userModelList = mutableListOf<UserModel>()
         userModelList.add(createAddUser())
@@ -106,7 +118,13 @@ class HomeViewModel(
 
 }
 
+sealed class HomeState {
+    object Loading: HomeState()
+    object Reading: HomeState()
+}
+
 sealed class HomeEvent {
     object Initialise : HomeEvent()
     class UserItemClicked(val userId: Int) : HomeEvent()
+    object UserAdded: HomeEvent()
 }
