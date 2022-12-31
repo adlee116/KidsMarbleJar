@@ -6,14 +6,16 @@
     android:layout_marginHorizontal="6dp"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <ImageView
+    <com.google.android.material.imageview.ShapeableImageView
         android:id="@+id/userImage"
         android:background="@drawable/avatar_circle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         android:padding="12dp"
+        android:scaleType="centerCrop"
+        app:shapeAppearanceOverlay="@style/circular"
         app:layout_constraintTop_toTopOf="parent"
         android:src="@drawable/add_user_image"/>
 

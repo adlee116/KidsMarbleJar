@@ -17,4 +17,8 @@ class UsersRepository(private val db: MarbleAppDatabase) {
         val userId = db.userDao().insertUser(user)
         return userId.toInt()
     }
+
+    suspend fun updateUser(user: UserEntity) {
+        db.userDao().updateUser(user)
+    }
 }
